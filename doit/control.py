@@ -43,6 +43,7 @@ class TaskControl(object):
 
     def __init__(self, task_list, auto_delayed_regex=False):
         self.tasks = OrderedDict()
+        self.shortcuts = {}
         self.targets = {}
         self.auto_delayed_regex = auto_delayed_regex
 
@@ -74,6 +75,7 @@ class TaskControl(object):
 
         self._check_dep_names()
         self.set_implicit_deps(self.targets, task_list)
+        self._add_shortcuts()
 
 
     def _check_dep_names(self):
@@ -89,6 +91,15 @@ class TaskControl(object):
                 if setup_task not in self.tasks:
                     msg = "Task '%s': invalid setup task '%s'."
                     raise InvalidTask(msg % (task.name, setup_task))
+
+
+    def _add_shortcuts(self):
+        """add non-ambiguous name shortcuts for all task names."""
+        all_task_names = list(self.tasks)
+        for task in six.itervalues(self.tasks):
+            shortcut = ''.join(w[0] for w in task.name.split('_'))
+            if not any(t.startswith(shortcut) for t in all_task_names):
+                self.shortcuts[shortcut] = task.name
 
 
     @staticmethod
@@ -188,6 +199,9 @@ class TaskControl(object):
         filter_list = self._process_filter(task_selection)
         for filter_ in filter_list:
             # by task name
+            if filter_ in self.shortcuts:
+                filter_ = self.shortcuts[filter_]
+
             if filter_ in self.tasks:
                 selected_task.append(filter_)
                 continue
@@ -199,6 +213,9 @@ class TaskControl(object):
 
             # if can not find name check if it is a sub-task of a delayed
             basename = filter_.split(':', 1)[0]
+            if basename in self.shortcuts:
+                basename = self.shortcuts[basename]
+
             if basename in self.tasks:
                 loader = self.tasks[basename].loader
                 loader.basename = basename
